@@ -1,0 +1,421 @@
+# ================================================================
+# Case Notes Microservice — Kubernetes Manifests
+# Apply with: kubectl apply -f k8s/ -n case-management
+# ================================================================
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: case-management
+  labels:
+    app.kubernetes.io/part-of: case-management-system
+
+---
+# ── PostgreSQL Secret (use External Secrets / Vault in production)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: case-management
+type: Opaque
+stringData:
+  POSTGRES_USER: case_notes_user
+  POSTGRES_PASSWORD: CHANGE_ME_IN_PRODUCTION
+  POSTGRES_DB: case_management
+  DB_URL: jdbc:postgresql://postgres-service:5432/case_management
+
+---
+# ── PostgreSQL PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: case-management
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard   # Change to your cluster's storageClass
+
+---
+# ── PostgreSQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: case-management
+  labels:
+    app: postgres
+    app.kubernetes.io/component: database
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, case_notes_user, -d, case_management]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, case_notes_user, -d, case_management]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
+
+---
+# ── PostgreSQL Service (ClusterIP — internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: case-management
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# ── ConfigMap: SQL init scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: case-management
+data:
+  # Mount 01_schema.sql content here or use a init container to copy from a volume
+
+---
+# ── Backend API: ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: case-notes-api-config
+  namespace: case-management
+data:
+  SERVER_PORT: "8080"
+  LOG_LEVEL: "INFO"
+  CORS_ORIGINS: "http://case-notes-frontend-service:3000"
+
+---
+# ── Backend API: Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-notes-api
+  namespace: case-management
+  labels:
+    app: case-notes-api
+    version: "1.0.0"
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: case-notes-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: case-notes-api
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/api/actuator/prometheus"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: case-notes-api
+          image: case-notes-service:1.0.0  # Replace with your registry
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: case-notes-api-config
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DB_URL
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /api/actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /api/actuator/health/liveness
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 10
+
+---
+# ── Backend API: Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-notes-api-service
+  namespace: case-management
+spec:
+  selector:
+    app: case-notes-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# ── Backend API: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: case-notes-api-hpa
+  namespace: case-management
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: case-notes-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ── Frontend: Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: case-notes-frontend
+  namespace: case-management
+  labels:
+    app: case-notes-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: case-notes-frontend
+  template:
+    metadata:
+      labels:
+        app: case-notes-frontend
+    spec:
+      containers:
+        - name: case-notes-frontend
+          image: case-notes-frontend:1.0.0  # Replace with your registry
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          env:
+            - name: VITE_API_BASE_URL
+              value: "http://case-notes-api-service:8080/api"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+---
+# ── Frontend: Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: case-notes-frontend-service
+  namespace: case-management
+spec:
+  selector:
+    app: case-notes-frontend
+  ports:
+    - port: 3000
+      targetPort: 80
+  type: ClusterIP
+
+---
+# ── Ingress (nginx)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: case-notes-ingress
+  namespace: case-management
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod   # Remove if not using cert-manager
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - case-notes.yourdomain.com
+      secretName: case-notes-tls
+  rules:
+    - host: case-notes.yourdomain.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: case-notes-api-service
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: case-notes-frontend-service
+                port:
+                  number: 3000
+
+---
+# ── NetworkPolicy: API can only be reached from frontend + ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: case-notes-api-netpol
+  namespace: case-management
+spec:
+  podSelector:
+    matchLabels:
+      app: case-notes-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: case-notes-frontend
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ── NetworkPolicy: Postgres accessible only from API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-netpol
+  namespace: case-management
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: case-notes-api
+      ports:
+        - protocol: TCP
+          port: 5432
