@@ -1,0 +1,13 @@
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/CaseNotesApplication.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/config/OpenApiConfig.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/config/WebConfig.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/controller/CaseNoteController.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/controller/CountryController.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/dto/CaseNoteDtos.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/exception/BadRequestException.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/exception/ConflictException.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/exception/GlobalExceptionHandler.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/exception/NotFoundException.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/repository/CaseNoteRepository.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/repository/CountryRepository.java
+/workspaces/Case_Notes/backend/src/main/java/com/casemanagement/notes/service/CaseNoteService.java
