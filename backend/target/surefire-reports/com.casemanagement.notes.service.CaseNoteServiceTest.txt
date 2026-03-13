@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.casemanagement.notes.service.CaseNoteServiceTest
+-------------------------------------------------------------------------------
+Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.055 s -- in com.casemanagement.notes.service.CaseNoteServiceTest
