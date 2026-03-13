@@ -16,7 +16,6 @@ public final class CaseNoteDtos {
     }
 
     public static class CreateRequest {
-        @NotBlank
         @Size(max = 100)
         private String caseId;
 
@@ -24,7 +23,6 @@ public final class CaseNoteDtos {
         @Size(max = 100)
         private String staffId;
 
-        @NotBlank
         @Size(min = 2, max = 2)
         private String countryCode;
 

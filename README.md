@@ -130,10 +130,24 @@ curl -X POST "http://localhost:8080/api/v1/cases/CASE-2024-00001/notes?countryCo
   }'
 ```
 
-List notes for a case:
+`caseId` comes from the route and `countryCode` comes from the query string, so neither field needs to be duplicated in the JSON body for create requests.
 
+**List notes for a case**
 ```bash
-curl "http://localhost:8080/api/v1/cases/CASE-2024-00001/notes?countryCode=GB&page=0&size=20"
+curl "http://localhost:8080/api/v1/cases/CASE-2024-00001/notes?countryCode=GB&includeDeleted=false&page=0&size=20" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Get a single note**
+```bash
+curl "http://localhost:8080/api/v1/notes/{uuid}?countryCode=GB&includeDeleted=false" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Search notes**
+```bash
+curl "http://localhost:8080/api/v1/notes/search?countryCode=GB&q=address&includeDeleted=false&page=0&size=20" \
+  -H "Authorization: Bearer <token>"
 ```
 
 Get one note:
