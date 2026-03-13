@@ -10,7 +10,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
   Plus, Trash2, Edit3, Search, ChevronLeft, ChevronRight,
-  FileText, AlertCircle, Eye, EyeOff, X, Save, Clock,
+  FileText, AlertCircle, X, Save, Clock,
   User, Globe, Bold, Italic, UnderlineIcon, AlignLeft,
   AlignCenter, AlignRight, List, ListOrdered, Highlighter,
   RotateCcw
@@ -75,79 +75,6 @@ function EditorToolbar({ editor }: { editor: any }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Note card component
-// ────────────────────────────────────────────────────────────
-function NoteCard({
-  note,
-  onEdit,
-  onDelete,
-}: {
-  note: CaseNote;
-  onEdit: (note: CaseNote) => void;
-  onDelete: (note: CaseNote) => void;
-}) {
-  return (
-    <div className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden
-      ${note.deleted ? 'opacity-60 border-red-100' : 'border-gray-200'}`}>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <User size={13} />
-            <span className="font-medium text-gray-700">{note.staffId}</span>
-            <span className="text-gray-300">•</span>
-            <Clock size={13} />
-            <span title={format(new Date(note.createdAt), 'PPpp')}>
-              {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {note.deleted ? (
-              <span className="flex items-center gap-1 text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
-                <Trash2 size={11} /> Deleted
-              </span>
-            ) : (
-              <>
-                <button
-                  onClick={() => onEdit(note)}
-                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                  title="Edit note">
-                  <Edit3 size={15} />
-                </button>
-                <button
-                  onClick={() => onDelete(note)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete note">
-                  <Trash2 size={15} />
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-          dangerouslySetInnerHTML={{ __html: note.noteContent }}
-        />
-
-        {note.deleted && note.deleteReason && (
-          <div className="mt-3 p-2 bg-red-50 rounded-lg text-xs text-red-600">
-            <strong>Deletion reason:</strong> {note.deleteReason}
-            {note.deletedBy && <span> — by {note.deletedBy}</span>}
-          </div>
-        )}
-      </div>
-      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center gap-3 text-xs text-gray-400">
-        <span>ID: <code className="font-mono">{note.id.slice(0, 8)}…</code></span>
-        <span>v{note.version}</span>
-        {note.updatedAt !== note.createdAt && (
-          <span>Edited {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────
 // Main App
 // ────────────────────────────────────────────────────────────
 export default function App() {
@@ -161,7 +88,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CaseNote[] | null>(null);
-  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [page, setPage] = useState(0);
 
   // Modal state
@@ -194,7 +120,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getNotesByCase(selectedCountry, caseId, { includeDeleted, page, size: 10 });
+      const data = await api.getNotesByCase(selectedCountry, caseId, { page, size: 10 });
       setNotes(data);
       setSearchResults(null);
     } catch (e: any) {
@@ -202,7 +128,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [caseId, selectedCountry, includeDeleted, page]);
+  }, [caseId, selectedCountry, page]);
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
 
@@ -211,7 +137,7 @@ export default function App() {
     if (!searchQuery.trim()) { setSearchResults(null); return; }
     setLoading(true);
     try {
-      const results = await api.searchNotes(selectedCountry, searchQuery, { includeDeleted });
+      const results = await api.searchNotes(selectedCountry, searchQuery);
       setSearchResults(results);
     } catch (e: any) {
       setError(e.response?.data?.message ?? 'Search failed');
@@ -350,15 +276,6 @@ export default function App() {
                 className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                 <Plus size={16} /> Add Note
               </button>
-              <button
-                onClick={() => setIncludeDeleted(v => !v)}
-                title={includeDeleted ? 'Hiding deleted' : 'Showing active only'}
-                className={`p-2 rounded-lg border transition-colors ${
-                  includeDeleted
-                    ? 'border-orange-300 bg-orange-50 text-orange-600'
-                    : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`}>
-                {includeDeleted ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
             </div>
           </div>
 
@@ -432,7 +349,7 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {displayedNotes.map(note => (
-                      <tr key={note.id} className={note.deleted ? 'bg-red-50/40' : 'hover:bg-gray-50'}>
+                      <tr key={note.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                           <div title={format(new Date(note.createdAt), 'PPpp')}>
                             {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
@@ -441,32 +358,22 @@ export default function App() {
                         <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-700">{note.staffId}</td>
                         <td className="px-4 py-3 text-gray-700">
                           <div className="max-w-xl line-clamp-2" dangerouslySetInnerHTML={{ __html: note.noteContent }} />
-                          {note.deleted && note.deleteReason && (
-                            <div className="mt-1 text-xs text-red-600">
-                              Deleted: {note.deleteReason}
-                              {note.deletedBy && <span> by {note.deletedBy}</span>}
-                            </div>
-                          )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {note.deleted ? (
-                            <span className="text-xs text-gray-400">No actions</span>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => openEdit(note)}
-                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                title="Edit note">
-                                <Edit3 size={15} />
-                              </button>
-                              <button
-                                onClick={() => setDeletingNote(note)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete note">
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEdit(note)}
+                              className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title="Edit note">
+                              <Edit3 size={15} />
+                            </button>
+                            <button
+                              onClick={() => setDeletingNote(note)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete note">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

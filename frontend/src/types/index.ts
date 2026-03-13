@@ -5,12 +5,8 @@ export interface CaseNote {
   countryCode: string;
   noteContent: string;
   notePlainText: string;
-  deleted: boolean;
   createdAt: string;
   updatedAt: string;
-  deletedAt?: string;
-  deletedBy?: string;
-  deleteReason?: string;
   version: number;
 }
 

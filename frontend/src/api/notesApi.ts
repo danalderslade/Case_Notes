@@ -27,12 +27,11 @@ export async function createNote(payload: CreateNoteRequest): Promise<CaseNote> 
 export async function getNotesByCase(
   countryCode: string,
   caseId: string,
-  options?: { includeDeleted?: boolean; page?: number; size?: number }
+  options?: { page?: number; size?: number }
 ): Promise<PagedResponse> {
   const response = await apiClient.get<PagedResponse>(`/v1/countries/${countryCode}/notes`, {
     params: {
       caseId,
-      includeDeleted: options?.includeDeleted ?? false,
       page: options?.page ?? 0,
       size: options?.size ?? 20,
     },
@@ -43,12 +42,11 @@ export async function getNotesByCase(
 export async function searchNotes(
   countryCode: string,
   query: string,
-  options?: { includeDeleted?: boolean; page?: number; size?: number }
+  options?: { page?: number; size?: number }
 ): Promise<CaseNote[]> {
   const response = await apiClient.get<CaseNote[]>(`/v1/countries/${countryCode}/notes/search`, {
     params: {
       q: query,
-      includeDeleted: options?.includeDeleted ?? false,
       page: options?.page ?? 0,
       size: options?.size ?? 20,
     },
