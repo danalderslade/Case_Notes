@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/v1/countries/{countryCode}/notes")
+@RequestMapping("/v1")
 @Tag(name = "Case Notes", description = "Manage case notes with per-country data isolation")
 public class CaseNoteController {
 
@@ -41,7 +41,6 @@ public class CaseNoteController {
         this.noteService = noteService;
     }
 
-    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create a new case note")
     @ApiResponses({
@@ -50,31 +49,34 @@ public class CaseNoteController {
             @ApiResponse(responseCode = "400", description = "Validation error"),
             @ApiResponse(responseCode = "404", description = "Country code not found")
     })
+    @PostMapping("/cases/{caseId}/notes")
     public ResponseEntity<NoteResponse> createNote(
+            @PathVariable String caseId,
             @Parameter(description = "ISO country code", example = "GB", required = true)
-            @PathVariable String countryCode,
+            @RequestParam String countryCode,
             @Valid @RequestBody CreateRequest request) {
 
+        request.setCaseId(caseId);
         request.setCountryCode(countryCode.toUpperCase());
         NoteResponse created = noteService.createNote(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/notes/{id}")
     @Operation(summary = "Retrieve a note by ID")
     public NoteResponse getNoteById(
-            @PathVariable String countryCode,
             @PathVariable UUID id,
+            @RequestParam String countryCode,
             @RequestParam(defaultValue = "false") boolean includeDeleted) {
 
         return noteService.getNoteById(countryCode, id, includeDeleted);
     }
 
-    @GetMapping
+    @GetMapping("/cases/{caseId}/notes")
     @Operation(summary = "List notes for a case")
     public PagedResponse getNotesByCase(
-            @PathVariable String countryCode,
-            @RequestParam String caseId,
+            @PathVariable String caseId,
+            @RequestParam String countryCode,
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -82,10 +84,10 @@ public class CaseNoteController {
         return noteService.getNotesByCase(countryCode, caseId, includeDeleted, page, size);
     }
 
-    @GetMapping("/search")
+    @GetMapping("/notes/search")
     @Operation(summary = "Full-text search notes")
     public List<NoteResponse> searchNotes(
-            @PathVariable String countryCode,
+            @RequestParam String countryCode,
             @RequestParam String q,
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
@@ -94,21 +96,21 @@ public class CaseNoteController {
         return noteService.searchNotes(countryCode, q, includeDeleted, page, size);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/notes/{id}")
     @Operation(summary = "Update a case note")
     public NoteResponse updateNote(
-            @PathVariable String countryCode,
             @PathVariable UUID id,
+            @RequestParam String countryCode,
             @Valid @RequestBody UpdateRequest request) {
 
         return noteService.updateNote(countryCode, id, request);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/notes/{id}")
     @Operation(summary = "Soft-delete a case note")
     public NoteResponse softDeleteNote(
-            @PathVariable String countryCode,
             @PathVariable UUID id,
+            @RequestParam String countryCode,
             @Valid @RequestBody DeleteRequest request) {
 
         return noteService.softDeleteNote(countryCode, id, request);
